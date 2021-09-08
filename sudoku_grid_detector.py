@@ -18,7 +18,7 @@ class SudokuGridDetector:
         self.binary_img = None
         self.sudoku_img = None
         self.sudoku_cells = None
-        self.contours = None
+        self.contour = None
         self.corners = None
         self.M = None
 
@@ -29,7 +29,8 @@ class SudokuGridDetector:
             raise ValueError('Resized image doesn\'t exist')
         self.binarizeImage()
         self.findSudokuGrid()
-        self.makeSudokuGridImage()
+        if self.corners is not None:
+            self.makeSudokuGridImage()
 
     def loadImage(self):
         """Load raw image and generate resized image"""
@@ -52,8 +53,6 @@ class SudokuGridDetector:
             self.raw_img, None, fx=self.delta, fy=self.delta, interpolation=cv2.INTER_CUBIC
         )
 
-    
-
     def binarizeImage(self):
         if self.resized_img is None:
             raise ValueError('Resized image doesn\'t exist')
@@ -64,7 +63,7 @@ class SudokuGridDetector:
         self.binary_img = cv2.adaptiveThreshold(
             img_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 21, 15)
 
-    def findSudokuGrid(self):
+    def findSudokuGrid(self, min_side_length_ratio=4):
         """Find the corners of the sudoku grid"""
         if self.binary_img is None:
             raise ValueError('Resized image doesn\'t exist')
@@ -72,20 +71,27 @@ class SudokuGridDetector:
         contours = cv2.findContours(self.binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
 
         simple_contours = []
+        # Look for a sudoku grid where the minimum pixel area is a ratio of smallest side of grid versus image shorter of width/height
+        min_area = (min(self.binary_img.shape[0], self.binary_img.shape[1]) / min_side_length_ratio)**2
+        best_contour = None
         for contour in contours:
-            # If it covers at least 1/6th of the image area
-            if cv2.contourArea(contour) > self.binary_img.shape[0] * self.binary_img.shape[1] / 6:
+            # If this contour area is > the current min area, replace best contour
+            area = cv2.contourArea(contour)
+            if area > min_area:
                 epsilon = 0.1 * cv2.arcLength(contour, True)
                 contour = cv2.approxPolyDP(contour, epsilon, True)
                 # contour = cv2.convexHull(contour) # Orders points nicely
                 if contour.shape[0] != 4:
                     continue
-                simple_contours.append(contour)
+                best_contour = contour
+                min_area = area
 
-        if len(simple_contours) != 1:
-            raise ValueError(f'Didn\'t find exactly one contour: {len(simple_contours)}')
-        self.contours = simple_contours
-        self.corners = self.orderPoints(np.float32(simple_contours[0][:, 0, :]))
+        if best_contour is None:
+            print('Didn\'t find any contours that matched.')
+            return
+        
+        self.contour = best_contour
+        self.corners = self.orderPoints(np.float32(best_contour[:, 0, :]))
 
     def makeSudokuGridImage(self, tilesize_px = 64):
         """ Generate warped image """

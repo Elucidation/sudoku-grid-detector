@@ -5,9 +5,10 @@ import numpy as np
 class SudokuGridDetector:
     """Load Sudoku image, find grid and generate a process sudoku grid image"""
 
-    def __init__(self, img_filepath : str):
+    def __init__(self, img_filepath : str, tilesize_px = 64):
         self.reset()
         self.img_filepath = img_filepath
+        self.tilesize_px = tilesize_px
         self.process()
 
     def reset(self):
@@ -18,6 +19,7 @@ class SudokuGridDetector:
         self.binary_img = None
         self.sudoku_img = None
         self.sudoku_cells = None
+        self.tilesize_px = None
         self.contour = None
         self.corners = None
         self.M = None
@@ -31,6 +33,7 @@ class SudokuGridDetector:
         self.findSudokuGrid()
         if self.corners is not None:
             self.makeSudokuGridImage()
+            self.generateSudokuCells()
 
     def loadImage(self):
         """Load raw image and generate resized image"""
@@ -93,17 +96,17 @@ class SudokuGridDetector:
         self.contour = best_contour
         self.corners = self.orderPoints(np.float32(best_contour[:, 0, :]))
 
-    def makeSudokuGridImage(self, tilesize_px = 64):
+    def makeSudokuGridImage(self):
         """ Generate warped image """
         if self.corners is None:
             raise ValueError('Corners of image not found yet')
           # px
-        output_pts = np.float32([[0, 0], [1, 0], [1, 1], [0, 1]]) * tilesize_px * 9
+        output_pts = np.float32([[0, 0], [1, 0], [1, 1], [0, 1]]) * self.tilesize_px * 9
         # Get warp on input points for original image (un-scale with delta)
         self.M = cv2.getPerspectiveTransform(self.corners / self.delta, output_pts)
         raw_blurred_img = cv2.GaussianBlur(self.raw_img, (5, 5), 0) # Expensive, not really necessary
         warped = cv2.warpPerspective(
-            raw_blurred_img, self.M, (tilesize_px * 9, tilesize_px * 9), flags=cv2.INTER_LINEAR
+            raw_blurred_img, self.M, (self.tilesize_px * 9, self.tilesize_px * 9), flags=cv2.INTER_LINEAR
         )
 
         self.sudoku_img = cv2.adaptiveThreshold(
@@ -115,22 +118,18 @@ class SudokuGridDetector:
             50,
         )
 
-        # warped img size is width = height = tilesize_px * 9
+        # warped img size is width = height = self.tilesize_px * 9
         # remove pixels where lines are
-        buffer_px = int(tilesize_px / 6) # Assume lines don't encroach > 1/6th of a tile
+        buffer_px = int(self.tilesize_px / 6) # Assume lines don't encroach > 1/6th of a tile
         for i in range(10):
-            self.sudoku_img[
-                :,
-                max(0, i * tilesize_px - buffer_px) : min(tilesize_px * 9, i * tilesize_px + buffer_px),
-            ] = 0
-            self.sudoku_img[
-                max(0, i * tilesize_px - buffer_px) : min(tilesize_px * 9, i * tilesize_px + buffer_px),
-                :,
-            ] = 0
+            self.sudoku_img[:, max(0, i * self.tilesize_px - buffer_px) : min(self.tilesize_px * 9, i * self.tilesize_px + buffer_px)] = 0
+            self.sudoku_img[max(0, i * self.tilesize_px - buffer_px) : min(self.tilesize_px * 9, i * self.tilesize_px + buffer_px), :] = 0
 
     def generateSudokuCells(self):
-        """Get TxTxN cell array"""
-        return
+        """Generate 9x9xTxT cell array (T = tile size in pixels) from a 9x9 grid image, each tile is TxT pixels"""
+        if self.sudoku_img.shape is None:
+            raise ValueError('Sudoku image not generated yet')
+        self.sudoku_cells = self.sudoku_img.reshape(9,self.tilesize_px,9,self.tilesize_px).swapaxes(1,2)
 
     def orderPoints(self, pts):
         """Re-order 4 corner points so top-left is first and clockwise."""

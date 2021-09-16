@@ -9,4 +9,5 @@
 3. Find largest quadrilateral contour
 4. Generate warped image of grid
 5. Remove extraneous lines
-6. (TODO) Match tiles to digits (CV or ML are both valid)
+6. Match tiles to digits using basic CV template matching
+*(TODO) Improve matching with ML-based digit detection*

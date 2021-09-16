@@ -1,3 +1,4 @@
+from CV_digits.generator import getCenteredTile
 import numpy as np
 from abc import ABC, abstractmethod
 
@@ -42,9 +43,10 @@ class SudokuDigitRecognizer_CV(SudokuDigitRecognizer):
     """ Detects the digit for a given binary image 64x64 tile.
     Returns the predicted integer digit. """
     probabilities = np.zeros(10, dtype = np.float)
-    # TODO : Center digits in tile first.
+    # Center digits in tile first.
+    centered_tile = getCenteredTile(tile)
     for i in range(10):
-      probabilities[i] = np.sum(self.digits[i,:,:] * tile) # Correlation-based
+      probabilities[i] = np.sum(self.digits[i,:,:] * centered_tile) # Correlation-based
     return np.argmax(probabilities)
 
 

@@ -16,6 +16,9 @@ def main():
     prediction = digit_recognizer.recognizeDigits(sudoku_grid.sudoku_cells)
     tot_time = time.time() - t_start
 
+    print('Sudoku Grid Prediction:')
+    print(prediction)
+
     print(f'Took {tot_time:.3f} seconds to load and process sudoku_grid image')
 
     # Generate intermediate images for plotting
@@ -48,21 +51,15 @@ def main():
     # Warped, binarized and line-removed sudoku_grid grid
     plt.imsave(fname='suduko.png', arr=sudoku_grid.sudoku_img, cmap='gray', vmin=0, vmax=255)
     plt.subplot(1, 4, 4), plt.imshow(sudoku_grid.sudoku_img, 'gray', vmin=0, vmax=255)
-    plt.title('WARPED')
+    for r in range(9):
+        for c in range(9):
+            if (prediction[r,c] > 0):
+                plt.text(c*tilesize_px+tilesize_px*.8, r*tilesize_px+tilesize_px*.3, f'{prediction[r,c]}',c='yellow')
+    plt.title('SUDOKU GRID')
     plt.xticks([]), plt.yticks([])
     plt.tight_layout()
 
-    # Show predictions in new figure
-    print('Sudoku Grid Prediction:')
-    print(prediction)
-    plt.figure(figsize=(10,10))
-    for r in range(9):
-        for c in range(9):
-            plt.subplot(9,9,r*9+c+1); plt.imshow(sudoku_grid.sudoku_cells[r,c,10:54,10:54], 'gray')
-            if (prediction[r,c] > 0):
-                plt.xlabel(f'{prediction[r,c]}')
-            plt.xticks([]), plt.yticks([])
-    plt.tight_layout()
+    # plt.savefig('example1.jpg')
     plt.show()
 
 

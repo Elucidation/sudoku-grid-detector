@@ -1,10 +1,12 @@
 from sudoku_grid_detector import SudokuGridDetector
 from sudoku_digit_recognizer import SudokuDigitRecognizer_CV
+from sudoku_solver import SudokuSolver
 
 from matplotlib import pyplot as plt
 import numpy as np
 import cv2
 import glob
+import os
 import time
 
 def processImage(img_filepath : str, tilesize_px : int) -> np.ndarray:
@@ -15,10 +17,21 @@ def processImage(img_filepath : str, tilesize_px : int) -> np.ndarray:
 
     t_start = time.time()
     digit_recognizer = SudokuDigitRecognizer_CV('CV_digits', tilesize_px)
-    prediction = digit_recognizer.recognizeDigits(sudoku_grid.sudoku_cells)
+    predicted_sudoku_grid = digit_recognizer.recognizeDigits(sudoku_grid.sudoku_cells)
     t_end = time.time() - t_start
     print(f'Took {t_end:.3f} seconds to detect the digits in the sudoku grid')
-    return sudoku_grid, prediction
+
+    t_start = time.time()
+    solver = SudokuSolver()
+    try:
+        solution = solver.solve(predicted_sudoku_grid)
+    except Exception as e:
+        print(e)
+        print('Skipping...')
+        solution = None
+    t_end = time.time() - t_start
+    print(f'Took {t_end:.3f} seconds to try and solve the sudoku grid')
+    return sudoku_grid, predicted_sudoku_grid, solution
 
 def prettyPrintGrid(grid : np.ndarray):
     """ Given 9x9 sudoku grid, return pretty string. """
@@ -62,7 +75,7 @@ def plotResults(sudoku_grid : SudokuGridDetector, prediction: np.ndarray, tilesi
     plt.text(10,10,msg,fontname='Consolas',horizontalalignment='left',verticalalignment='top', fontsize=12, color='yellow')
 
     # Warped, binarized and line-removed sudoku_grid grid
-    plt.imsave(fname='suduko.png', arr=sudoku_grid.sudoku_img, cmap='gray', vmin=0, vmax=255)
+    # plt.imsave(fname='suduko.png', arr=sudoku_grid.sudoku_img, cmap='gray', vmin=0, vmax=255)
     plt.subplot(1, 4, 4), plt.imshow(sudoku_grid.sudoku_img, 'gray', vmin=0, vmax=255)
     for r in range(9):
         for c in range(9):
@@ -77,19 +90,26 @@ def main():
     tilesize_px = 64 # hard-coded for CV_digits for now.
 
     # img_filepath='inputs/full1.jpg'
+    if not os.path.exists('results'):
+        os.mkdir('results')
     for i, img_filepath in enumerate(glob.glob('inputs/*.jpg')):
 
         # Time processing of image into predicted sudoku grid and solving it
         t_start = time.time()
-        sudoku_grid, prediction = processImage(img_filepath, tilesize_px)
+        sudoku_grid, predicted_sudoku_grid, solution = processImage(img_filepath, tilesize_px)
         tot_time = time.time() - t_start
         print(f'Took {tot_time:.3f} seconds total to process an input image')
 
         print('Sudoku Grid Prediction:')
-        print(prediction)
+        print(predicted_sudoku_grid)
+
+        if solution is not None:
+            predicted_sudoku_grid = solution
+            print('Completed Sudoku Grid:')
+            print(predicted_sudoku_grid)
 
         # Visualize 
-        plotResults(sudoku_grid, prediction, tilesize_px)
+        plotResults(sudoku_grid, predicted_sudoku_grid, tilesize_px)
         plt.suptitle(img_filepath)
         plt.savefig(f'results/result_{i:02d}.jpg')
     # plt.show()
